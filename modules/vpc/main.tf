@@ -65,27 +65,27 @@ resource "aws_route_table_association" "PublicSubnetAssoc" {
 }
 
 # Route Table for Private Subnets and NAT Gateway to allow internet access
-resource "aws_eip" "eip" {
-  associate_with_private_ip = var.eip_associate_with_private_ip
-  tags = {
-    Name = "${var.ResourcePrefix}-eip"
-  }
-}
+# resource "aws_eip" "eip" {
+#   associate_with_private_ip = var.eip_associate_with_private_ip
+#   tags = {
+#     Name = "${var.ResourcePrefix}-eip"
+#   }
+# }
  
-resource "aws_nat_gateway" "ngw" {
-  allocation_id = aws_eip.eip.id
-  subnet_id     = aws_subnet.public_subnet[0].id // Corrected reference
-  tags = {
-    Name = "${var.ResourcePrefix}-ngw"
-  }
-}
+# resource "aws_nat_gateway" "ngw" {
+#   allocation_id = aws_eip.eip.id
+#   subnet_id     = aws_subnet.public_subnet[0].id // Corrected reference
+#   tags = {
+#     Name = "${var.ResourcePrefix}-ngw"
+#   }
+# }
  
 resource "aws_route_table" "PrivateRT" {
   vpc_id = aws_vpc.vpc.id
-  route {
-    cidr_block     = var.PrivateRT_cidr
-    nat_gateway_id = aws_nat_gateway.ngw.id
-  }
+  # route {
+  #   cidr_block     = var.PrivateRT_cidr
+  #   nat_gateway_id = aws_nat_gateway.ngw.id
+  # }
   tags = {
     Name = "${var.ResourcePrefix}-Private-RT"
   }

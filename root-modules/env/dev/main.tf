@@ -23,7 +23,7 @@ module "vpc" {
 module "alb_sg" {
   source          = "../../../modules/security/alb"
   vpc_id          = module.vpc.vpc_id
-  env = "GNPC-Dev"
+  env = "Dev"
 
   alb_sg_ingress_rules = [
     {
@@ -65,7 +65,7 @@ module "alb_sg" {
 module "web_sg" {
   source          = "../../../modules/security/web"
   vpc_id          = module.vpc.vpc_id
-  env = "GNPC-Dev"
+  env = "Dev"
 
   web_ingress_rules = [
     {
@@ -100,7 +100,7 @@ module "web_sg" {
 module "db_sg" {
   source          = "../../../modules/security/db"
   vpc_id          = module.vpc.vpc_id
-  env = "GNPC-Dev"
+  env = "Dev"
 
   db_sg_ingress_rules = [
     {
@@ -125,6 +125,8 @@ module "db_sg" {
     Name        = "db-sg"
     Environment = "Dev"
   }
+  # Cache Security Group
+  cache_source_sg = [module.web_sg.web_sg_id]  # only app servers can talk to cache
 }
 
 
@@ -132,7 +134,7 @@ module "db_sg" {
 module "monitoring_sg" {
   source          = "../../../modules/security/monitoring"
   vpc_id          = module.vpc.vpc_id
-  env = "GNPC-Dev"
+  env = "Dev"
 
   monitoring_ingress_rules = [
     {
@@ -167,6 +169,34 @@ module "monitoring_sg" {
   }
 
 }
+
+
+
+module "alb_asg" {
+  source = "../../../modules/alb-asg" # adjust path to where you put the module
+
+  vpc_id              = module.vpc.vpc_id
+  subnet_ids          = module.vpc.public_subnets
+  web_sg_id           = module.web_sg.web_sg_id
+  alb_sg_id           = [module.alb_sg.alb_sg_id] # ALB SG expects a list
+  ami_id              = "ami-08b5b3a93ed654d19" # Amazon Linux 2023 AMI ID in us-east-1 as of April 2024
+  instance_type       = "t2.micro"
+  key_name            = "us-east-1-musty"
+  user_data           = file("${path.module}/../../../scripts/public_userdata.sh") # Update the user_data script as needed
+
+  launch_template_name = "startup-web-lt"
+  asg_name             = "startup-web-asg"
+  asg_min_size         = 1
+  asg_max_size         = 2
+  asg_desired_capacity = 1
+
+  alb_name          = "startup-web-alb"
+  target_group_name = "startup-web-tg"
+  app_port          = 3000
+  alb_type          = "application"
+}
+
+
 
 
 # # EC2 Module
@@ -223,7 +253,7 @@ module "iam" {
   # Resource Tags
   env          = "dev"
   
-  company_name = "GNPC"
+  company_name = "Startup"
 
   # Role Services Allowed
   admin_role_principals          = ["ec2.amazonaws.com", "cloudwatch.amazonaws.com", "config.amazonaws.com", "apigateway.amazonaws.com", "ssm.amazonaws.com"]  # Only include the services that actually need to assume the role.
@@ -253,17 +283,17 @@ module "s3" {
   config_bucket_name = module.s3.config_bucket_name
   config_key_prefix = "config-logs"
   config_role_arn = module.iam.config_role_arn
-  log_bucket_name                      = "gnpc-dev-log-bucket"
-  operations_bucket_name          = "gnpc-devoperations-bucket"
-  replication_bucket_name = "gnpc-replication-bucket"
+  log_bucket_name                      = "startup-dev-log-bucket"
+  operations_bucket_name          = "startup-dev-operations-bucket"
+  replication_bucket_name = "startup-replication-bucket"
   log_bucket_versioning_status = "Enabled"
   operations_bucket_versioning_status    = "Enabled"
   replication_bucket_versioning_status   = "Enabled"
   logging_prefix                  = "logs/"
-  ResourcePrefix                  = "GNPC-Dev"
+  ResourcePrefix                  = "Dev"
   tags                            = {
     Environment = "dev"
-    Project     = "GNPC"
+    Project     = "startup"
   }
 }
 
@@ -305,31 +335,39 @@ module "s3" {
 
 
 
-# # module "rds" {
-# #   source = "../../../modules/rds"
-# #   identifier = "gnpc-dev-db"
-# #   db_engine = "postgres"
-# #   db_engine_version = "15.5" # check for the latest version
-# #   instance_class = "db.t3.micro"
-# #   allocated_storage = 10
-# #   db_name = "mydb"
-# #   username = module.ssm.db_access_parameter_value
-# #   password = module.ssm.db_secret_parameter_value
-# #   subnet_ids = module.vpc.vpc_private_subnets
-# #   vpc_security_group_ids = [module.security_group.private_sg_id]
-# #   db_subnet_group_name = "rds-subnet-group"
-# #   multi_az = false
-# #   storage_type = "gp2"
-# #   backup_retention_period = 7
-# #   skip_final_snapshot = true
-# #   publicly_accessible = false
-# #   env = "dev"
-# #   db_tags = {
-# #     Name        = "rds-instance"
-# #     Environment = "Dev"
-# #     Owner       = "Musty"
-# #   }
-# # }
+module "db" {
+  source = "../../../modules/rds"
+
+  # RDS Variables
+  identifier              = "dev-db"
+  db_engine               = "postgres"
+  db_engine_version       = "15.5"
+  instance_class          = "db.t3.micro"
+  allocated_storage       = 10
+  db_name                 = "mydb"
+  username                = module.ssm.db_access_parameter_value
+  password                = module.ssm.db_secret_parameter_value
+  vpc_security_group_ids  = [module.db_sg.db_sg_id]   # from SG module
+  subnet_ids              = module.vpc.private_subnets
+  db_subnet_group_name    = "rds-subnet-group"
+  multi_az                = true
+  storage_type            = "gp3"
+  backup_retention_period = 7
+  skip_final_snapshot     = true
+  publicly_accessible     = false
+  env                     = "dev"
+  db_tags = {
+    Name        = "rds-instance"
+    Environment = "Dev"
+    Owner       = "startup"
+  }
+
+  # ElastiCache Variables
+  node_type       = "cache.t3.micro"
+  num_cache_nodes = 2
+  cache_sg_ids    = [module.db_sg.cache_sg_id]  # from SG module
+}
+
 
 
 
@@ -353,11 +391,11 @@ module "cdn_route53" {
   region = "us-east-1"
 
   # The root domain you want to register & host in Route 53
-  hosted_zone_name = "mustydain.com"
+  hosted_zone_name = "company-domain-name.com"
 
   # Two subdomains (will map to two CloudFront distributions)
-  app_domain_primary   = "app.mustydain.com"
-  app_domain_secondary = "api.mustydain.com"
+  app_domain_primary   = "app.company-domain-name.com"
+  app_domain_secondary = "api.company-domain-name.com"
 
   # ALB name as set by your Ingress annotation
   # e.g. alb.ingress.kubernetes.io/load-balancer-name: eks-alb
@@ -372,30 +410,14 @@ module "cdn_route53" {
 
 }
 
-
-module "alb_asg" {
-  source = "../../../modules/alb-asg" # adjust path to where you put the module
-
-  vpc_id              = module.vpc.vpc_id
-  subnet_ids          = module.vpc.public_subnets
-  web_sg_id           = module.web_sg.web_sg_id
-  alb_sg_id           = [module.alb_sg.alb_sg_id] # ALB SG expects a list
-  ami_id              = "ami-08b5b3a93ed654d19" # Amazon Linux 2023 AMI ID in us-east-1 as of April 2024
-  instance_type       = "t2.micro"
-  key_name            = "us-east-1-musty"
-  user_data           = file("${path.module}/../../../scripts/public_userdata.sh") # Update the user_data script as needed
-
-  launch_template_name = "startup-web-lt"
-  asg_name             = "startup-web-asg"
-  asg_min_size         = 1
-  asg_max_size         = 2
-  asg_desired_capacity = 1
-
-  alb_name          = "startup-web-alb"
-  target_group_name = "startup-web-tg"
-  app_port          = 3000
-  alb_type          = "application"
+module "efs" {
+  source          = "../../../modules/efs"
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnets
+  allowed_sg_ids  = [module.web_sg.web_sg_id]
+  
 }
+
 
 
 

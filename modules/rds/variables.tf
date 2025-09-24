@@ -101,9 +101,23 @@ variable "subnet_ids" {
 
 
 
+ variable "node_type" {
+  description = "The instance type of the cache nodes"
+  type        = string
+  default     = "cache.t3.micro"
+}
 
+variable "num_cache_nodes" {
+  description = "The number of cache nodes"
+  type        = number
+  default     = 2
+}
 
-
+variable "cache_sg_ids" {
+  description = "List of security group IDs for ElastiCache"
+  type        = list(string)
+  default     = []
+}
 
 
 

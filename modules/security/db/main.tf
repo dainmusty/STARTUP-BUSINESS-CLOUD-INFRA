@@ -40,3 +40,28 @@ resource "aws_security_group" "db_sg" {
 }
 
 
+# Cache SG
+# Security group for ElastiCache (Memcached)
+resource "aws_security_group" "cache_sg" {
+  name        = "${var.env}-cache-sg"
+  description = "Allow app servers to access Memcached"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port       = 11211
+    to_port         = 11211
+    protocol        = "tcp"
+    security_groups = var.cache_source_sg # only app servers can talk to cache
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.env}-cache-sg"
+  }
+}

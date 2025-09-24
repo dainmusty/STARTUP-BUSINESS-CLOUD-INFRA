@@ -25,3 +25,19 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
   }
 }
 
+# ElastiCache (Memcached) Setup
+resource "aws_elasticache_subnet_group" "memcached" {
+  name       = "${var.env}-memcached-subnets"
+  subnet_ids = var.subnet_ids
+}
+
+resource "aws_elasticache_cluster" "memcached" {
+  cluster_id           = "${var.env}-memcached"
+  engine               = "memcached"
+  node_type            = var.node_type 
+  num_cache_nodes      = var.num_cache_nodes  # one per AZ
+  parameter_group_name = "default.memcached1.6"
+  port                 = 11211
+  subnet_group_name    = aws_elasticache_subnet_group.memcached.name
+  security_group_ids   = var.cache_sg_ids 
+}

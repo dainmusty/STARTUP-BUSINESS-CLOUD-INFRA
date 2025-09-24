@@ -39,3 +39,9 @@ variable "db_sg_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cache_source_sg" {
+  description = "List of security group IDs allowed to access ElastiCache"
+  type        = list(string)
+  default     = []
+}

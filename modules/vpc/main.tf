@@ -97,3 +97,56 @@ resource "aws_route_table_association" "PrivateSubnetAssoc" {
   route_table_id = aws_route_table.PrivateRT.id 
 }
 
+
+# VPC Flow Logs (Optional)
+resource "aws_flow_log" "vpc_flow_logs" {
+  count = var.enable_flow_logs ? 1 : 0
+
+  log_destination      = var.flow_logs_destination_arn
+  log_destination_type = var.flow_logs_destination_type
+  traffic_type         = var.flow_logs_traffic_type
+  vpc_id               = aws_vpc.vpc.id
+
+  iam_role_arn = var.flow_logs_destination_type == "cloud-watch-logs" ? var.vpc_flow_log_iam_role_arn : null
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.env}-vpc-flow-logs"
+    }
+  )
+}
+
+
+# Default Security Group
+resource "aws_default_security_group" "restrict_default" {
+  vpc_id = aws_vpc.vpc.id
+
+  # Explicitly deny all inbound traffic
+  ingress {
+    protocol         = "-1"
+    from_port        = 0
+    to_port          = 0
+    self             = false
+    cidr_blocks      = []
+    ipv6_cidr_blocks = []
+    prefix_list_ids  = []
+    security_groups  = []
+  }
+
+  # Allow all outbound traffic (common default)
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.env}-default-sg-restricted"
+    }
+  )
+}

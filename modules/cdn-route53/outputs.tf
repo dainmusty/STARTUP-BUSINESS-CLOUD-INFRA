@@ -3,3 +3,4 @@ output "secondary_cf_domain"       { value = aws_cloudfront_distribution.seconda
 
 output "primary_fqdn"              { value = var.app_domain_primary }
 output "secondary_fqdn"            { value = var.app_domain_secondary }
+

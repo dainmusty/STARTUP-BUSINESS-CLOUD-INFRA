@@ -67,7 +67,11 @@ variable "log_bucket_arn" {
   type        = string
 }
 
-
+variable "log_bucket_name" {
+  description = "Name of the S3 bucket for S3 RW access"
+  type        = string
+  
+}
 
 
 

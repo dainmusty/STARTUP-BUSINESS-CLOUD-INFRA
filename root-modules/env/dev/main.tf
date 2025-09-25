@@ -15,7 +15,20 @@ module "vpc" {
   cluster_name          = "effulgencetech-dev"
   PrivateRT_cidr        = "0.0.0.0/0"
   eip_associate_with_private_ip = true
-}
+  tags = {
+    Environment = "Dev"
+    Project     = "Startup"
+  }
+
+ # 🔽 Flow logs config
+      enable_flow_logs           = true # Enable VPC flow logs
+      flow_logs_destination_type = "s3" # change to "cloud-watch-logs" if using CloudWatch Logs
+      flow_logs_destination_arn  = module.s3.log_bucket_arn
+      flow_logs_traffic_type     = "ALL" # ACCEPT → capture only accepted traffic. # REJECT → capture only rejected traffic. ALL → capture all traffic.
+      vpc_flow_log_iam_role_arn  = null  # Provide iam role if using CloudWatch Logs
+      env                        = "dev"
+}    
+  
 
 
 # Security Groups Module
@@ -252,7 +265,6 @@ module "iam" {
 
   # Resource Tags
   env          = "dev"
-  
   company_name = "Startup"
 
   # Role Services Allowed
@@ -271,6 +283,9 @@ module "iam" {
   # S3 Buckets Referenced
   log_bucket_arn        = module.s3.operations_bucket_arn
   operations_bucket_arn = module.s3.log_bucket_arn
+
+  # Flow logs variables
+  log_bucket_name = module.s3.log_bucket_name
 
 
 }
@@ -420,5 +435,17 @@ module "efs" {
 
 
 
+module "cloud_security" {
+  source = "../../../modules/cloud-security"
 
+  env           = "startup"
+  alb_arn       = module.alb_asg.alb_arn
+  waf_scope     = "REGIONAL"
+  associate_alb = true
+
+  blocked_ips = [
+    "1.2.3.4/32",
+    "5.6.7.8/32"
+  ]
+}
 
